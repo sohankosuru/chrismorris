@@ -1,0 +1,7 @@
+from machine import Pin, PWM
+
+pwm0 = PWM(Pin(12), freq=5000, duty_u16=32768)
+
+
+while True:
+    pwm0.duty(1023)
