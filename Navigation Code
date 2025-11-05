@@ -84,6 +84,7 @@ def constrain(val, min_val, max_val):
             return min(max_val, max(min_val, val))
 
 def set_angle(target):
+ threshold = 0.10472
  while (abs(target - Enes100.theta)) > threshold:
             turnValue = target - currentTheta
             turnValue = constrain(turnValue, MIN_TURN_SPEED, MAX_TURN_SPEED)
