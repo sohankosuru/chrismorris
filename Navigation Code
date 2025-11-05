@@ -1,0 +1,129 @@
+from enes100 import enes100
+from hcsr041 import HCSR041
+from hcsr042 import HCSR042
+from hcsr043 import HCSR043
+from dcmotor1 import DCMotor1
+from dcmotor2 import DCMotor2
+from machine import Pin, PWM
+from time import sleep
+
+#coordinates and orientation
+enes100.x
+enes100.y
+enes100.theta
+enes100.is_visible
+MIN_TURN_SPEED=
+MAX_TURN_SPEED=
+
+#dc motor 1 i.e left motor
+frequency = 15000
+pin1 = Pin(12, Pin.OUT)
+pin2 = Pin(14, Pin.OUT)
+enable = PWM(Pin(13), frequency)
+dc_motor1 = DCMotor1(pin1, pin2, enable)
+#Set min duty cycle (350) and max duty cycle (1023)
+#dc_motor1 = DCMotor1(pin1, pin2, enable, 350, 1023)
+
+#dc motor 2 i.e right motor
+frequency = 15000
+pin1 = Pin(12, Pin.OUT)
+pin2 = Pin(14, Pin.OUT)
+enable = PWM(Pin(13), frequency)
+dc_motor2 = DCMotor2(pin1, pin2, enable)
+#Set min duty cycle (350) and max duty cycle (1023)
+#dc_motor2 = DCMotor2(pin1, pin2, enable, 350, 1023)
+
+# Ultrasonic Sensor 1
+sensor1 = HCSR041(trigger_pin=5, echo_pin=18, echo_timeout_us=10000)
+#Ultrasonic Sensor 2
+sensor2 = HCSR042(trigger_pin=5, echo_pin=18, echo_timeout_us=10000)
+#Ultrasonic Sensor 3
+sensor3 = HCSR043(trigger_pin=5, echo_pin=18, echo_timeout_us=10000)
+
+
+def simple_test():
+        # Team Name, Mission Type, Aruco ID, Room Num
+        enes100.begin("Chris Morris AWOG", "MATERIAL",aruco id,1201)
+        enes100.println("Connected!")
+        
+        # enes100.x -> your x coordinate. 0-4, in meters, -1 if aruco is not visible
+        # enes100.y -> your y coordinate. 0-2, in meters, -1 if aruco is not visible
+        # enes100.theta -> your theta. -pi to pi, in radians, -1 if aruco is not visible
+        if enes100.is_visible:
+            enes100.print(f"We are at {enes100.x=} {enes100.y=} {enes100.theta=}")
+
+def obstacle_sensor_1():
+    distance = sensor1.distance_cm()
+    print('Distance:', distance, 'cm')
+    return distance
+
+def obstacle_sensor_2():
+    distance = sensor2.distance_cm()
+    print('Distance:' , distance, 'cm')
+    return distance
+
+def obstacle_sensor_3():
+    distance = sensor3.distance_cm()
+    print('Distance:' , distance, 'cm')
+    return distance
+
+def set_motors(left_speed, right_speed):
+    # Left motor
+    if left_speed >= 0:
+        dc_motor1.forward(left_speed)
+    else:
+        dc_motor1.backward(abs(left_speed))
+    
+    # Right motor
+    if right_speed >= 0:
+        dc_motor2.forward(right_speed)
+    else:
+        dc_motor2.backward(abs(right_speed))
+
+def constrain(val, min_val, max_val):
+            return min(max_val, max(min_val, val))
+
+def set_angle(target):
+ while (abs(target - Enes100.theta)) > threshold:
+            turnValue = target - currentTheta
+            turnValue = constrain(turnValue, MIN_TURN_SPEED, MAX_TURN_SPEED)
+            set_motors(turnValue, -turnValue)
+            
+
+def forward_navigation():                
+    if enes100.x < 0.75 and enes100.y < 0.75:   
+        enes100.print("OTV is at Mission Site B")  
+        # rotate the OTV to head towards +ve PI/2 radian
+        self_angle(1.57)
+        while enes100.y < 1.5: #heading towards Mission Site A           
+            dc_motor1.forward()            
+            dc_motor2.forward()           
+            sleep(0.1)                     
+        dc_motor1.stop()                   
+        dc_motor2.stop()                   
+
+        self_angle(0)# rotate the OTV to head towards 0 radian
+        while enes100.x < 3.2: # heading towards the open zone         
+            dc_motor1.forward()            
+            dc_motor2.forward()            
+            sleep(0.1)                     
+        dc_motor1.stop()                   
+        dc_motor2.stop()                   
+
+    else:                                  
+        enes100.print("OTV is at Mission Site A")
+        self_angle(-1.57)# rotate the OTV to head towards -ve PI/2 radian
+        while enes100.y > 0.5: # heading towards Mission Site B             
+            dc_motor1.forward()            
+            dc_motor2.forward()            
+            sleep(0.1)                     
+        dc_motor1.stop()                   
+        dc_motor2.stop()                   
+
+        self_angle(0)# rotate the OTV to head towards 0 radian
+        while enes100.x < 3.2: # heading towards the open zone           
+            dc_motor1.forward()            
+            dc_motor2.forward()            
+            sleep(0.1)                     
+        dc_motor1.stop()                   
+        dc_motor2.stop()          
