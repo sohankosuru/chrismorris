@@ -4,7 +4,7 @@
 class DCMotor1:
   #the min_duty and max_duty are defined for 15000Hz frequency
   #you can pass as arguments
-  def __init__(self, pin1, pin2, enable_pin, min_duty=750, max_duty=1023):
+  def __init__(self, pin1, pin2, enable_pin, min_duty=0, max_duty=1023):
     self.pin1 = pin1
     self.pin2= pin2
     self.enable_pin = enable_pin
