@@ -1,0 +1,108 @@
+from enes100 import enes100
+from machine import Pin, PWM
+from time import sleep
+
+# Motor pins
+pin12 = Pin(12)
+pin13 = Pin(13)
+pin25 = Pin(25)
+pin26 = Pin(26)
+
+
+pwm0 = PWM(pin12, freq=5000,duty_u16=32768)
+pwm1 = PWM(pin13, freq=5000,duty_u16=32768)
+pwm2 = PWM(pin25, freq=5000,duty_u16=32768)
+pwm3 = PWM(pin26, freq=5000,duty_u16=32768)
+
+MIN_TURN_SPEED = 200
+MAX_TURN_SPEED = 1023
+
+
+def forward1(speed):
+    pwm0.duty(0)
+    pwm2.duty(speed)
+
+def forward2(speed):
+    pwm1.duty(0)
+    pwm3.duty(speed)
+
+def backward1(speed):
+    pwm0.duty(speed)
+    pwm2.duty(0)
+
+def backward2(speed):
+    pwm1.duty(speed)
+    pwm3.duty(0)
+
+def stop1():
+    pwm0.duty(0)
+    pwm2.duty(0)
+
+def stop2():
+    pwm1.duty(0)
+    pwm3.duty(0)
+
+def set_motors(left, right):
+    
+    # Left side
+    if left >= 0:
+        forward1(left)
+    else:
+        backward1(-left)
+
+    # Right side
+    if right >= 0:
+        forward2(right)
+    else:
+        backward2(-right)
+
+def constrain(val, min_val, max_val):
+    return max(min(val, max_val), min_val)
+
+
+
+
+def set_angle(target):
+    threshold = 0.10 
+
+    while abs(target - enes100.theta) > threshold:
+
+        currentTheta = enes100.theta
+        error = target - currentTheta
+
+        
+        turnValue = int(constrain(abs(error) * 400, MIN_TURN_SPEED, MAX_TURN_SPEED))
+
+        if error > 0:   
+            set_motors(-turnValue, turnValue)
+        else:           
+            set_motors(turnValue, -turnValue)
+
+        sleep(0.05)
+
+     
+    set_motors(0, 0)
+
+
+
+
+def forward_navigation():
+    while enes100.x < 3.2:
+
+        
+        forward1(1023)
+        forward2(1023)
+
+        
+        if abs(enes100.x - 1.6) < 0.15:
+            set_angle(1.57)   
+            set_angle(0)      
+
+        
+        if abs(enes100.x - 3.0) < 0.15:
+            set_angle(1.57)   
+
+        sleep(0.1)
+
+    stop1()
+    stop2()
