@@ -13,14 +13,14 @@ pwm2 = PWM(pin25, freq=5000, duty_u16=32768)
 pwm3 = PWM(pin26, freq=5000, duty_u16=32768)
 
 def forward():
-    pwm0.duty(1023)
-    pwm2.duty(0)
+    pwm0.duty(0)
+    pwm2.duty(1023)
     pwm1.duty(0)
     pwm3.duty(1023)
 
 def backward():
-    pwm0.duty(0)
-    pwm2.duty(1023)
+    pwm0.duty(1023)
+    pwm2.duty(0)
     pwm1.duty(1023)
     pwm3.duty(0)
 
