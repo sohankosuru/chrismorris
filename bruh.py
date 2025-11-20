@@ -20,5 +20,3 @@ while True:
     
     pwm1.duty(0)
     pwm3.duty(1023)
-    
-    print('hi')
