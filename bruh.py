@@ -14,9 +14,11 @@ pwm3 = PWM(pin26, freq=5000, duty_u16=32768)
 
 while True:
     pwm0.duty(1023)
-    pwm1.duty(0)
-    
     pwm2.duty(0)
+    
+    
+    
+    pwm1.duty(0)
     pwm3.duty(1023)
     
     print('hi')
