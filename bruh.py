@@ -23,4 +23,13 @@ def backward():
     pwm2.duty(1023)
     pwm1.duty(1023)
     pwm3.duty(0)
+
+def stop():
+    pwm0.duty(0)
+    pwm2.duty(0)
+    pwm1.duty(0)
+    pwm3.duty(0)
+    
+
+
     
