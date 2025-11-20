@@ -17,4 +17,10 @@ def forward():
     pwm2.duty(0)
     pwm1.duty(0)
     pwm3.duty(1023)
+
+def backward():
+    pwm0.duty(0)
+    pwm2.duty(1023)
+    pwm1.duty(1023)
+    pwm3.duty(0)
     
