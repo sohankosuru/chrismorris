@@ -14,7 +14,7 @@ from hcsr04 import HCSR04
 TEAM_NAME  = "Team Chris Morris AWOG"
 TEAM_TYPE  = "MATERIAL"   # mission type
 ARUCO_ID   = 7            ### TODO: your ArUco marker ID (int)
-ROOM_NUM   = 1120            ### TODO: 1116 or 1120
+ROOM_NUM   = 1116            ### TODO: 1116 or 1120
 
 # ============================================================
 # MOTOR CONFIG – YOUR WORKING CODE
@@ -28,8 +28,8 @@ PRINT_FEEDBACK = True
 # PWM objects – exactly as in your script
 pwm0 = PWM(Pin(26), freq=FREQ)  # motor A input 1
 pwm1 = PWM(Pin(27), freq=FREQ)  # motor A input 2
-pwm2 = PWM(Pin(14), freq=FREQ)  # motor B input 1
-pwm3 = PWM(Pin(12), freq=FREQ)  # motor B input 2
+pwm2 = PWM(Pin(33), freq=FREQ)  # motor B input 1
+pwm3 = PWM(Pin(32), freq=FREQ)  # motor B input 2
 
 def set_pwm_duty(pwm, duty_10bit):
     if duty_10bit < 0:
@@ -106,14 +106,14 @@ def stop():
 # ============================================================
 
 # TODO: fill in the actual GPIO numbers for these 6 pins
-FRONT_TRIG_PIN = 33   # e.g. 5
-FRONT_ECHO_PIN = 19   # e.g. 18
+FRONT_TRIG_PIN = 4   # e.g. 5
+FRONT_ECHO_PIN = 23   # e.g. 18
 
-LEFT_TRIG_PIN  = 32   # e.g. 16
-LEFT_ECHO_PIN  = 27   # e.g. 17
+LEFT_TRIG_PIN  = 2   # e.g. 16
+LEFT_ECHO_PIN  = 18   # e.g. 17
 
-RIGHT_TRIG_PIN = 18   # e.g. 19
-RIGHT_ECHO_PIN = 34  # e.g. 21
+RIGHT_TRIG_PIN = 0   # e.g. 19
+RIGHT_ECHO_PIN = 25  # e.g. 21
 
 front_sonar = HCSR04(FRONT_TRIG_PIN, FRONT_ECHO_PIN)
 left_sonar  = HCSR04(LEFT_TRIG_PIN,  LEFT_ECHO_PIN)
@@ -237,10 +237,6 @@ def forward_with_obstacle_check(speed=DEFAULT_SPEED):
 # ============================================================
 
 def set_angle(target):
-    """
-    Turn in place until enes100.theta ≈ target (radians).
-    Uses P control but with your full-speed turn functions.
-    """
     target = normalize_angle(target)
     print("set_angle → target =", target)
     wait_for_visibility()
@@ -254,105 +250,28 @@ def set_angle(target):
             continue
 
         error = normalize_angle(target - theta)
-        print("theta={:.3f}, error={:.3f}".format(theta, error))
+        print("set_angle(): theta={:.3f}, target={:.3f}, error={:.3f}".format(
+            theta, target, error))
 
         if abs(error) < THETA_THRESHOLD:
+            print("Angle aligned: |error|={:.3f} < threshold".format(abs(error)))
             break
 
         turn_cmd = TURN_KP * error
         turn_cmd = constrain(turn_cmd, -1.0, 1.0)
 
+        # FIXED: Correct direction labeling
         if turn_cmd > 0:
-            # positive error → need to rotate CCW (right motor backward, left forward)
-            turn_right(DEFAULT_SPEED)
-        else:
-            # negative error → rotate CW
+            print("Cmd: CCW turn (LEFT). turn_cmd={:.2f}".format(turn_cmd))
             turn_left(DEFAULT_SPEED)
+        else:
+            print("Cmd: CW turn (RIGHT). turn_cmd={:.2f}".format(turn_cmd))
+            turn_right(DEFAULT_SPEED)
 
         sleep(0.02)
 
     stop()
     print("Reached target angle.")
-
-# ============================================================
-# POSITION CONTROL: drive_to(x, y)
-# ============================================================
-
-def drive_to(target_x, target_y, speed=DEFAULT_SPEED):
-    """
-    Move in an 'L' shape:
-      1) Adjust x to target_x (along +x or -x)
-      2) Adjust y to target_y (along +y or -y)
-    """
-    # --- Phase 1: adjust X ---
-    wait_for_visibility()
-    x = enes100.x
-    print("drive_to X: now x={:.3f}, target_x={:.3f}".format(x, target_x))
-
-    if x < target_x:
-        set_angle(0.0)  # +x
-        while True:
-            if not enes100.is_visible:
-                print("Lost visibility (X+); waiting...")
-                stop()
-                wait_for_visibility()
-            x = enes100.x
-            print("Moving +X → x={:.3f}".format(x))
-            if x >= target_x - X_TOLERANCE:
-                break
-            forward_with_obstacle_check(speed)
-            sleep(0.05)
-    else:
-        set_angle(pi)   # -x
-        while True:
-            if not enes100.is_visible:
-                print("Lost visibility (X-); waiting...")
-                stop()
-                wait_for_visibility()
-            x = enes100.x
-            print("Moving -X → x={:.3f}".format(x))
-            if x <= target_x + X_TOLERANCE:
-                break
-            forward_with_obstacle_check(speed)
-            sleep(0.05)
-
-    stop()
-    print("Reached target X.")
-
-    # --- Phase 2: adjust Y ---
-    wait_for_visibility()
-    y = enes100.y
-    print("drive_to Y: now y={:.3f}, target_y={:.3f}".format(y, target_y))
-
-    if y < target_y:
-        set_angle(pi / 2)  # +y
-        while True:
-            if not enes100.is_visible:
-                print("Lost visibility (Y+); waiting...")
-                stop()
-                wait_for_visibility()
-            y = enes100.y
-            print("Moving +Y → y={:.3f}".format(y))
-            if y >= target_y - Y_TOLERANCE:
-                break
-            forward_with_obstacle_check(speed)
-            sleep(0.05)
-    else:
-        set_angle(-pi / 2) # -y
-        while True:
-            if not enes100.is_visible:
-                print("Lost visibility (Y-); waiting...")
-                stop()
-                wait_for_visibility()
-            y = enes100.y
-            print("Moving -Y → y={:.3f}".format(y))
-            if y <= target_y + Y_TOLERANCE:
-                break
-            forward_with_obstacle_check(speed)
-            sleep(0.05)
-
-    stop()
-    print("Reached target Y.")
 
 # ============================================================
 # MISSION LOGIC – LIMBO-ONLY (TOP LANE)
