@@ -3,13 +3,13 @@ from hcsr04 import HCSR04
 from time import sleep
 
 FRONT_TRIG_PIN = 4   # e.g. 5
-FRONT_ECHO_PIN = 18   # e.g. 18
+FRONT_ECHO_PIN = 23   # e.g. 18
 
 LEFT_TRIG_PIN  = 2   # e.g. 16
 LEFT_ECHO_PIN  = 18   # e.g. 17
 
 RIGHT_TRIG_PIN = 0   # e.g. 19
-RIGHT_ECHO_PIN = 18   # e.g. 21
+RIGHT_ECHO_PIN = 25   # e.g. 21
 # ESP32
 front_sonar = HCSR04(FRONT_TRIG_PIN, FRONT_ECHO_PIN)
 left_sonar  = HCSR04(LEFT_TRIG_PIN,  LEFT_ECHO_PIN)
