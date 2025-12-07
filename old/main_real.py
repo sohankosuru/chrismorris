@@ -1,5 +1,9 @@
-# main.py – ENES100 OTV navigation
-# Uses your working motor PWM code + enes100 + 3x HCSR04 ultrasonics
+# main.py – ENES100 OTV navigation for MATERIAL mission
+# Uses:
+#   - Motors on pins: 26, 27, 33, 32  (your working config)
+#   - Ultrasonics on pins: 4, 23, 2, 18, 0, 25 (your working config)
+#   - ENES100 vision system
+#   - Limbo/top-lane navigation
 
 from machine import Pin, PWM
 from time import sleep
@@ -8,24 +12,39 @@ from enes100 import enes100
 from hcsr04 import HCSR04
 
 # ============================================================
-# ENES100 CONFIG – FILL THESE IN
+# ENES100 CONFIG
 # ============================================================
 
 TEAM_NAME  = "Team Chris Morris AWOG"
 TEAM_TYPE  = "MATERIAL"   # mission type
-ARUCO_ID   = 7            ### TODO: your ArUco marker ID (int)
-ROOM_NUM   = 1116            ### TODO: 1116 or 1120
+ARUCO_ID   = 7
+ROOM_NUM   = 1116         # 1116 or 1120
+
+# Flag so debug() knows when it's safe to call enes100.print
+ENES_READY = False
+
+def debug(msg: str):
+    """Send debug text to WiFi vision console only."""
+    global ENES_READY
+    if ENES_READY:
+        try:
+            # truncate so we don't spam huge lines
+            enes100.print(msg[:120])
+        except Exception:
+            # if WiFi print fails, just ignore
+            pass
 
 # ============================================================
-# MOTOR CONFIG – YOUR WORKING CODE
+# MOTOR CONFIG – YOUR WORKING PINS
 # ============================================================
 
 FREQ = 5000
 MAX_DUTY_10BIT = 1023
-DEFAULT_SPEED = 700  # 0..1023
+DEFAULT_SPEED = 700     # 0..1023
+ANGLE_TURN_SPEED = 500  # a bit slower for turning
 PRINT_FEEDBACK = True
 
-# PWM objects – exactly as in your script
+# PWM objects – same pins as your working differential_drive_keys.py
 pwm0 = PWM(Pin(26), freq=FREQ)  # motor A input 1
 pwm1 = PWM(Pin(27), freq=FREQ)  # motor A input 2
 pwm2 = PWM(Pin(33), freq=FREQ)  # motor B input 1
@@ -42,7 +61,7 @@ def set_pwm_duty(pwm, duty_10bit):
         scale = 65535 // MAX_DUTY_10BIT
         pwm.duty_u16(int(duty_10bit * scale))
 
-# --- motor primitives (unchanged) ---
+# --- motor primitives ---
 def motor_a_forward(speed=DEFAULT_SPEED):
     set_pwm_duty(pwm0, speed)
     set_pwm_duty(pwm1, 0)
@@ -76,50 +95,50 @@ def go_forward(speed=DEFAULT_SPEED):
     motor_a_forward(speed)
     motor_b_forward(speed)
     if PRINT_FEEDBACK:
-        print("FORWARD (speed={})".format(speed))
+        debug("FORWARD (speed={})".format(speed))
 
 def go_reverse(speed=DEFAULT_SPEED):
     motor_a_reverse(speed)
     motor_b_reverse(speed)
     if PRINT_FEEDBACK:
-        print("REVERSE (speed={})".format(speed))
+        debug("REVERSE (speed={})".format(speed))
 
 def turn_left(speed=DEFAULT_SPEED):
+    # same behavior as your working script: A reverse, B forward
     motor_a_reverse(speed)
     motor_b_forward(speed)
     if PRINT_FEEDBACK:
-        print("TURN LEFT (speed={})".format(speed))
+        debug("TURN LEFT (speed={})".format(speed))
 
 def turn_right(speed=DEFAULT_SPEED):
     motor_a_forward(speed)
     motor_b_reverse(speed)
     if PRINT_FEEDBACK:
-        print("TURN RIGHT (speed={})".format(speed))
+        debug("TURN RIGHT (speed={})".format(speed))
 
 def stop():
     stop_all()
     if PRINT_FEEDBACK:
-        print("STOP")
+        debug("STOP")
 
 # ============================================================
 # ULTRASONIC SENSORS – 3x HCSR04 (front, left, right)
+# Using pins from your working test script
 # ============================================================
 
-# TODO: fill in the actual GPIO numbers for these 6 pins
-FRONT_TRIG_PIN = 4   # e.g. 5
-FRONT_ECHO_PIN = 23   # e.g. 18
+FRONT_TRIG_PIN = 4
+FRONT_ECHO_PIN = 23
 
-LEFT_TRIG_PIN  = 2   # e.g. 16
-LEFT_ECHO_PIN  = 18   # e.g. 17
+LEFT_TRIG_PIN  = 2
+LEFT_ECHO_PIN  = 18
 
-RIGHT_TRIG_PIN = 0   # e.g. 19
-RIGHT_ECHO_PIN = 25  # e.g. 21
+RIGHT_TRIG_PIN = 0
+RIGHT_ECHO_PIN = 25
 
 front_sonar = HCSR04(FRONT_TRIG_PIN, FRONT_ECHO_PIN)
 left_sonar  = HCSR04(LEFT_TRIG_PIN,  LEFT_ECHO_PIN)
 right_sonar = HCSR04(RIGHT_TRIG_PIN, RIGHT_ECHO_PIN)
 
-# Safety thresholds (tweak in lab)
 SAFE_FRONT_CM = 20.0   # stop/avoid if front < 20 cm
 SAFE_SIDE_CM  = 15.0   # steer away if side < 15 cm
 
@@ -131,14 +150,16 @@ ARENA_Y_MAX        = 2.0
 OPEN_ZONE_START_X  = 2.8    # start of open zone
 GOAL_CENTER_X      = 3.7    # approx center of goal zone
 TOP_LANE_Y         = 1.5    # limbo row
-# BOTTOM_LANE_Y    = 0.5    # log row (we’re not using this)
 
 # Nav tuning
-X_TOLERANCE = 0.03
-Y_TOLERANCE = 0.03
+X_TOLERANCE     = 0.03
+Y_TOLERANCE     = 0.03
 THETA_THRESHOLD = 0.05  # radians (~3°)
+TURN_KP         = 1.0   # not heavily used now, but kept
 
-TURN_KP = 1.0   # P gain for set_angle
+# You said: facing obstacle zone gives theta ≈ -pi/2
+# We want that to be "0" in our control frame → add +pi/2
+HEADING_OFFSET = pi / 2
 
 # ============================================================
 # HELPER FUNCTIONS
@@ -154,11 +175,20 @@ def normalize_angle(angle):
         angle += 2 * pi
     return angle
 
+def get_robot_theta():
+    """Return theta with optional constant offset."""
+    th = enes100.theta
+    if th == -1:
+        return -1
+    return normalize_angle(th + HEADING_OFFSET)
+
 def wait_for_visibility():
+    """Block until marker visible."""
     while not enes100.is_visible:
-        print("Waiting for visibility...")
+        debug("Waiting for visibility...")
         sleep(0.1)
-    print("Marker visible.")
+    debug("Marker visible. x={:.3f}, y={:.3f}, theta_eff={:.3f}".format(
+        enes100.x, enes100.y, get_robot_theta()))
 
 def safe_distance(sensor):
     try:
@@ -175,11 +205,11 @@ def read_all_distances():
     if dl is None: dl = 999
     if dr is None: dr = 999
 
-    print("Distances  F:{:.1f}  L:{:.1f}  R:{:.1f} cm".format(df, dl, dr))
+    debug("Distances  F:{:.1f}  L:{:.1f}  R:{:.1f} cm".format(df, dl, dr))
     return df, dl, dr
 
 # ============================================================
-# OBSTACLE-AWARE FORWARD USING YOUR MOTOR FUNCTIONS
+# OBSTACLE-AWARE FORWARD
 # ============================================================
 
 def forward_with_obstacle_check(speed=DEFAULT_SPEED):
@@ -191,7 +221,7 @@ def forward_with_obstacle_check(speed=DEFAULT_SPEED):
 
     # Hard avoid if front is blocked
     if df < SAFE_FRONT_CM:
-        print("Front obstacle – backing up and turning.")
+        debug("Front obstacle – backing up and turning.")
         stop()
         sleep(0.1)
 
@@ -202,13 +232,13 @@ def forward_with_obstacle_check(speed=DEFAULT_SPEED):
 
         # Turn toward more open side
         if dl > dr + 5:
-            print("More space on LEFT → turn left.")
+            debug("More space on LEFT → turn left.")
             turn_left(speed)
         elif dr > dl + 5:
-            print("More space on RIGHT → turn right.")
+            debug("More space on RIGHT → turn right.")
             turn_right(speed)
         else:
-            print("Sides similar → default turn right.")
+            debug("Sides similar → default turn right.")
             turn_right(speed)
 
         sleep(0.5)
@@ -221,14 +251,13 @@ def forward_with_obstacle_check(speed=DEFAULT_SPEED):
     right_close = dr < SAFE_SIDE_CM
 
     if left_close and not right_close:
-        print("Wall LEFT → veer right.")
-        # left wheel slower: right motor forward, left motor slight reverse/stop
-        motor_a_reverse(int(speed * 0.3))  # left
-        motor_b_forward(speed)             # right
+        debug("Wall LEFT → veer right.")
+        motor_a_reverse(int(speed * 0.3))  # left wheel slow/reverse
+        motor_b_forward(speed)             # right wheel fast
     elif right_close and not left_close:
-        print("Wall RIGHT → veer left.")
-        motor_a_forward(speed)             # left
-        motor_b_reverse(int(speed * 0.3))  # right
+        debug("Wall RIGHT → veer left.")
+        motor_a_forward(speed)
+        motor_b_reverse(int(speed * 0.3))
     else:
         go_forward(speed)
 
@@ -237,41 +266,111 @@ def forward_with_obstacle_check(speed=DEFAULT_SPEED):
 # ============================================================
 
 def set_angle(target):
+    """
+    Turn in place until robot theta ≈ target (radians).
+    Uses sign of error to decide turn direction.
+    """
     target = normalize_angle(target)
-    print("set_angle → target =", target)
+    debug("set_angle → target = {:.3f}".format(target))
     wait_for_visibility()
 
     while True:
-        theta = enes100.theta
+        theta = get_robot_theta()
         if theta == -1:
-            print("Theta not visible; waiting...")
+            debug("Theta not visible; waiting...")
             stop()
             sleep(0.1)
             continue
 
         error = normalize_angle(target - theta)
-        print("set_angle(): theta={:.3f}, target={:.3f}, error={:.3f}".format(
+        debug("set_angle(): theta={:.3f}, target={:.3f}, error={:.3f}".format(
             theta, target, error))
 
         if abs(error) < THETA_THRESHOLD:
-            print("Angle aligned: |error|={:.3f} < threshold".format(abs(error)))
+            debug("Angle aligned: |error|={:.3f} < threshold".format(abs(error)))
             break
 
-        turn_cmd = TURN_KP * error
-        turn_cmd = constrain(turn_cmd, -1.0, 1.0)
-
-        # FIXED: Correct direction labeling
-        if turn_cmd > 0:
-            print("Cmd: CCW turn (LEFT). turn_cmd={:.2f}".format(turn_cmd))
-            turn_left(DEFAULT_SPEED)
+        if error > 0:
+            debug("Cmd: CCW turn (LEFT)")
+            turn_left(ANGLE_TURN_SPEED)
         else:
-            print("Cmd: CW turn (RIGHT). turn_cmd={:.2f}".format(turn_cmd))
-            turn_right(DEFAULT_SPEED)
+            debug("Cmd: CW turn (RIGHT)")
+            turn_right(ANGLE_TURN_SPEED)
 
         sleep(0.02)
 
     stop()
-    print("Reached target angle.")
+    debug("Reached target angle.")
+
+# ============================================================
+# POSITION CONTROL: drive_to(x, y)
+# ============================================================
+
+def drive_to(target_x, target_y, speed=DEFAULT_SPEED):
+    """
+    Move in an 'L' shape:
+      1) Adjust x to target_x (along +x or -x)
+      2) Adjust y to target_y (along +y or -y)
+    Uses forward_with_obstacle_check for straight segments.
+    """
+    debug("drive_to(): target_x={:.3f}, target_y={:.3f}".format(target_x, target_y))
+
+    # --- Phase 1: adjust X ---
+    wait_for_visibility()
+    while True:
+        x = enes100.x
+        if x == -1:
+            debug("X not visible; waiting...")
+            stop()
+            wait_for_visibility()
+            continue
+
+        debug("drive_to X: x={:.3f}, target_x={:.3f}".format(x, target_x))
+
+        if abs(x - target_x) <= X_TOLERANCE:
+            debug("X aligned.")
+            stop()
+            break
+
+        if x < target_x:
+            set_angle(0.0)    # face +x (obstacle zone direction)
+        else:
+            set_angle(pi)     # face -x (back toward start)
+
+        forward_with_obstacle_check(speed)
+        sleep(0.1)
+        stop()
+        sleep(0.05)
+
+    # --- Phase 2: adjust Y ---
+    wait_for_visibility()
+    while True:
+        y = enes100.y
+        if y == -1:
+            debug("Y not visible; waiting...")
+            stop()
+            wait_for_visibility()
+            continue
+
+        debug("drive_to Y: y={:.3f}, target_y={:.3f}".format(y, target_y))
+
+        if abs(y - target_y) <= Y_TOLERANCE:
+            debug("Y aligned.")
+            stop()
+            break
+
+        if y < target_y:
+            set_angle(pi/2)    # face +y
+        else:
+            set_angle(-pi/2)   # face -y
+
+        forward_with_obstacle_check(speed)
+        sleep(0.1)
+        stop()
+        sleep(0.05)
+
+    stop()
+    debug("drive_to: reached ({:.3f}, {:.3f})".format(target_x, target_y))
 
 # ============================================================
 # MISSION LOGIC – LIMBO-ONLY (TOP LANE)
@@ -289,55 +388,81 @@ def run_mission():
     wait_for_visibility()
     start_x = enes100.x
     start_y = enes100.y
-    print("Start pose: x={:.3f}, y={:.3f}".format(start_x, start_y))
+    debug("Start pose: x={:.3f}, y={:.3f}".format(start_x, start_y))
 
     # Mission site is mirrored across y=1.0
     mission_x = start_x
     mission_y = ARENA_Y_MAX - start_y
-    print("Mission site: x={:.3f}, y={:.3f}".format(mission_x, mission_y))
+    debug("Mission site: x={:.3f}, y={:.3f}".format(mission_x, mission_y))
 
     # Step 1: go to mission site
     drive_to(mission_x, mission_y)
 
     # Step 2: shift to TOP lane (limbo path)
-    print("Shifting to TOP lane at y={:.2f}".format(TOP_LANE_Y))
+    debug("Shifting to TOP lane at y={:.2f}".format(TOP_LANE_Y))
     drive_to(mission_x, TOP_LANE_Y)
 
     # Step 3: enter obstacle zone at x≈1.0
     entry_x = 1.0
+    debug("Driving to obstacle entry at x={:.2f}".format(entry_x))
     drive_to(entry_x, TOP_LANE_Y)
 
     # Step 4: exit obstacle zone at x≈2.7
     exit_x = 2.7
+    debug("Driving to obstacle exit at x={:.2f}".format(exit_x))
     drive_to(exit_x, TOP_LANE_Y)
 
     # Step 5: move into open zone (under limbo) and then goal zone
+    debug("Driving into open zone at x={:.2f}".format(OPEN_ZONE_START_X))
     drive_to(OPEN_ZONE_START_X, TOP_LANE_Y)
+
+    debug("Driving to goal center at x={:.2f}".format(GOAL_CENTER_X))
     drive_to(GOAL_CENTER_X, TOP_LANE_Y)
 
     stop()
-    print("Arrived in goal zone on TOP lane!")
+    debug("Arrived in goal zone on TOP lane!")
 
-    # Step 6: MATERIAL mission report (replace with your real values)
+    # Step 6: MATERIAL mission report (placeholder values)
     enes100.mission('WEIGHT', 'MEDIUM')          # 'HEAVY','MEDIUM','LIGHT'
     enes100.mission('MATERIAL_TYPE', 'PLASTIC')  # 'FOAM','PLASTIC'
+    debug("Mission calls sent: WEIGHT=MEDIUM, MATERIAL_TYPE=PLASTIC")
 
 # ============================================================
 # MAIN
 # ============================================================
 
 def main():
-    print("Starting ENES100 OTV navigation...")
+    global ENES_READY
     stop_all()
+
+    # Connect to vision system
     enes100.begin(TEAM_NAME, TEAM_TYPE, ARUCO_ID, ROOM_NUM)
+    ENES_READY = True
     enes100.print("Connected from main()")
 
-    # Quick ultrasonic sanity check
-    for _ in range(3):
-        read_all_distances()
-        sleep(0.3)
+    try:
+        # Quick ultrasonic sanity check
+        for _ in range(3):
+            read_all_distances()
+            sleep(0.3)
 
-    run_mission()
+        # For first test you *can* temporarily replace run_mission() with:
+        #   wait_for_visibility()
+        #   sx, sy = enes100.x, enes100.y
+        #   drive_to(sx + 0.3, sy)
+        # to see a small forward move.
+        run_mission()
+        debug("run_mission() completed.")
+        enes100.print("Mission completed.")
+    except Exception as e:
+        msg = "ERROR in main: {}".format(repr(e))
+        try:
+            enes100.print(msg[:120])
+        except Exception:
+            pass
+    finally:
+        stop_all()
+        debug("main() exiting, motors stopped.")
 
 if __name__ == "__main__":
     main()
