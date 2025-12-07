@@ -18,8 +18,8 @@ PRINT_FEEDBACK = True
 # --- PWM objects (from your starter code) ---
 pwm0 = PWM(Pin(26), freq=FREQ)  # motor A input 1
 pwm1 = PWM(Pin(27), freq=FREQ)  # motor A input 2
-pwm2 = PWM(Pin(14), freq=FREQ)  # motor B input 1
-pwm3 = PWM(Pin(12), freq=FREQ)  # motor B input 2
+pwm2 = PWM(Pin(33), freq=FREQ)  # motor B input 1
+pwm3 = PWM(Pin(32), freq=FREQ)  # motor B input 2
 
 # --- helper to set duty robustly (handles duty() or duty_u16() variants) ---
 def set_pwm_duty(pwm, duty_10bit):
