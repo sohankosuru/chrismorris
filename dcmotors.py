@@ -6,7 +6,10 @@ import time
 
 FREQ = 5000
 MAX_DUTY = 1023
-SPEED = 700
+
+# separate speeds
+SPEED_A = 700
+SPEED_B = 675
 
 # Motor pins (your wiring)
 pwm0 = PWM(Pin(26), freq=FREQ)  # Motor A input 1
@@ -23,21 +26,21 @@ def set_pwm(pwm, duty):
         pwm.duty_u16(int(duty * scale))
 
 # --- motor primitives ---
-def motor_a_forward(speed):
-    set_pwm(pwm0, speed)
+def motor_a_forward():
+    set_pwm(pwm0, SPEED_A)
     set_pwm(pwm1, 0)
 
-def motor_a_reverse(speed):
+def motor_a_reverse():
     set_pwm(pwm0, 0)
-    set_pwm(pwm1, speed)
+    set_pwm(pwm1, SPEED_A)
 
-def motor_b_forward(speed):
-    set_pwm(pwm2, speed)
+def motor_b_forward():
+    set_pwm(pwm2, SPEED_B)
     set_pwm(pwm3, 0)
 
-def motor_b_reverse(speed):
+def motor_b_reverse():
     set_pwm(pwm2, 0)
-    set_pwm(pwm3, speed)
+    set_pwm(pwm3, SPEED_B)
 
 def stop_all():
     set_pwm(pwm0, 0)
@@ -45,26 +48,25 @@ def stop_all():
     set_pwm(pwm2, 0)
     set_pwm(pwm3, 0)
 
-# --- high level (your corrected mapping) ---
-# electrical reverse = robot forward
+# --- high level commands ---
 def go_forward():
-    motor_a_reverse(SPEED)
-    motor_b_reverse(SPEED)
+    motor_a_reverse()
+    motor_b_reverse()
     print("FORWARD")
 
 def go_backward():
-    motor_a_forward(SPEED)
-    motor_b_forward(SPEED)
+    motor_a_forward()
+    motor_b_forward()
     print("BACKWARD")
 
 def turn_left():
-    motor_a_reverse(SPEED)
-    motor_b_forward(SPEED)
+    motor_a_reverse()
+    motor_b_forward()
     print("LEFT")
 
 def turn_right():
-    motor_a_forward(SPEED)
-    motor_b_reverse(SPEED)
+    motor_a_forward()
+    motor_b_reverse()
     print("RIGHT")
 
 # --- Auto Test Sequence ---
@@ -74,23 +76,18 @@ def main():
     stop_all()
     time.sleep(1)
 
-    # Forward test
     go_forward()
-    time.sleep(2)
+    time.sleep(200)
 
-    # Backward test
     go_backward()
     time.sleep(2)
 
-    # Left turn
     turn_left()
     time.sleep(1.5)
 
-    # Right turn
     turn_right()
     time.sleep(1.5)
 
-    # Done
     stop_all()
     print("=== AUTO MOTOR TEST COMPLETE ===")
 
