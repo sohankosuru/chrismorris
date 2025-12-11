@@ -271,8 +271,11 @@ def run_mission_zone_only():
 
     # 1) Turn to face the correct direction along mission line
     turn_to(TARGET_ANGLE)
-
-    # 2) Drive straight to target_y
+    
+#   # 2)Follow the blue line
+#   forward_to_x(0.3)
+    
+    # 3) Drive straight to target_y
     forward_to_y(TARGET_Y)
 
     enes100.print("MISSION ZONE COMPLETE (stopped at y≈{:.2f})".format(TARGET_Y))
