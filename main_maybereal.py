@@ -170,6 +170,8 @@ def calibrate_sensor():
         ranges.append(val)
         
     capsensor_treshold = min(ranges)
+    
+    enes100.print("capsensor calibrated to: soft ball")
         
 
 
@@ -303,8 +305,13 @@ def do_mission():
     
     while not enes100.is_visible:
         sleep(0.1)
+        enes100.print("in not visible loop")
+    
+  
         
     curr_y = enes100.y
+    
+    enes100.print("getting current y")
      
     if start_y < 1.0:
         # We are at Mission B (bottom)
@@ -319,14 +326,18 @@ def do_mission():
         
     turn_to(TARGET_ANGLE)
     
+    enes100.print("turning backwards")
+    
     backward_to_y(TARGET_Y)
     
     # detect it rn
-    if (capsensor.read_uv() < capsensor_treshold)
-        enes100.print("hard balls")
-    else
-        enes100.print("soft balls")
-    
+    if capsensor.read_uv() < capsensor_treshold:
+        enes100.mission('MATERIAL_TYPE', 'PLASTIC')
+        enes100.print("lastic ball")
+    else:
+        enes100.mission('MATERIAL_TYPE', 'FOAM')
+        enes100.print("foam")
+        
     enes100.print("MISSION COMPLETE (stopped at y≈{:.2f})".format(TARGET_Y))
     stop()
     
@@ -513,7 +524,7 @@ def obstacle_zone():
 
 def main():
     stop()
-    enes100.begin("Chris Morris AWOG", "MATERIAL", 7, 1116)
+    enes100.begin("Chris Morris AWOG", "MATERIAL", 7, 1120)
     sleep(0.3)
     calibrate_sensor()
 
