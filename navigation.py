@@ -330,12 +330,45 @@ def obstacle_zone():
             forward_to_y_auto(1.3)
             turn_to(-pi/2)
             
+            # Drive forward along x until x = 3.65
+            while True:
+                if not enes100.is_visible:
+                    stop()
+                    sleep(0.1)
+                    continue
+                
+                x=enes100.x
+                if x>= 3.65:
+                    stop()
+                    enes100.print("Navigation successful: reached x≈3.65, y≈{:.2f}".format(enes100.y))
+                    break
+                
+                drive_forward()
+                sleep(0.05)   
+            
+            
         else: 
             enes100.print("Column 2 at x=1.6 cleared near y=1.2")
             enes100.print("Going to open zone position (2.8, 1.3, -pi/2)")
             forward_to_x(2.8)
             forward_to_y_auto(1.3)
             turn_to(-pi/2)
+            
+            # Drive forward along x until x = 3.65
+            while True:
+                if not enes100.is_visible:
+                    stop()
+                    sleep(0.1)
+                    continue
+                
+                x=enes100.x
+                if x>= 3.65:
+                    stop()
+                    enes100.print("Navigation successful: reached x≈3.65, y≈{:.2f}".format(enes100.y))
+                    break
+                
+                drive_forward()
+                sleep(0.05)          
             
     else:
         enes100.print("Column 2 at x≈1.6 cleared at y=0.7")
@@ -344,7 +377,7 @@ def obstacle_zone():
         forward_to_y_auto(1.3)
         turn_to(-pi/2)
 
-        # Drive forward along x until x=3.65
+        # Drive forward along x until x = 3.65
         while True:
             if not enes100.is_visible:
                 stop()
